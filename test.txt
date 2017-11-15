@@ -1,0 +1,366 @@
+0156871800120171011201710111LC 134          01000000BDLJBAMA      000005GOLDMAN                   DCV         CASH000997DTC 997   075887109BDX       0000000002000000203.000000 0000000040600.00DF41 01.0600015.004 00.000301.38166 00000.000000            USDUSD 0100000000 U86FF 000002N                              N                                     N      001            000.00CASH1  102.0000   USD 0000000000000.00 0000000000000.00EQUILEND LOAN         000000000000000000000000000000002017101620171013 0000004RSA00000000 0000000000000.00 0000000.000000 000.000 0000000000000.00  00000000002.37 00000000002.37 00000000002.37 00000000002.37 00000000000.11 00000000000.11 00000000000.11 00000000000.11 00000000003.12 00000000003.12 00000000003.12 00000000003.12 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 0000000.0000000010 0 YY       NNN      20171011 000000.0000000001.0000000000000000000000000000 000.000000000000000000201.430000CRSA 000000000200 0000000040600.00 0000000000000.002017101620171013                    -0000000040286      N                               000000000000000000000.000000000000000000                     X01568718   20171011201710111LC 124          00000000XX01SSB OMNI  000005GOLDMAN                   DCV         CASH000997DTC 997   075887109BDX       0000000002000000203.000000 0000000040600.00DF41 01.0600025.004 00.000 00.00000 00000.000000            USDUSD  100000000    FF 001002                               N                                     N      001            000.00CASH1  102.0000   USD 0000000000000.00 0000000000000.00EQUILEND LOAN         000000000000000000000000000000002017101620171013 0000004RSA00000000 0000000000000.00 0000000.000000 000.000 0000000000000.00  00000000002.37 00000000002.37 00000000002.37 00000000002.37-00000000000.59-00000000000.59-00000000000.59-00000000000.59 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 00000000000.00 0000000.0000000010 0 YY       NNN      20171011 000000.0000000001.0000000000000000000000000000 000.000000000000000000201.430000CRSA 000000000200 0000000040600.00 0000000000000.002017101620171013                    -0000000040600      N                               000000000000000000000.000000000000000000                     X
+
+
+public static List<String> splitMessage(String msg) {
+		List<String> list = new ArrayList<String>();
+		list.add(msg.substring(0, 2));
+		msg = msg.substring(2);
+		list.add(msg.substring(2,8));
+		msg = msg.substring(8);
+		list.add(msg.substring(8,11));
+		msg = msg.substring(11);
+		list.add(msg.substring(11,19));
+		msg = msg.substring(19);
+		list.add(msg.substring(19,27));
+		msg = msg.substring(27);
+		list.add(msg.substring(27,28));
+		msg = msg.substring(28);
+		list.add(msg.substring(28,29));
+		msg = msg.substring(29);
+		list.add(msg.substring(29,30));
+		msg = msg.substring(30);
+		list.add(msg.substring(30,31));
+		msg = msg.substring(31);
+		list.add(msg.substring(31,32));
+		msg = msg.substring(32);
+		list.add(msg.substring(32,33));
+		msg = msg.substring(33);
+		list.add(msg.substring(33,34));
+		msg = msg.substring(34);
+		list.add(msg.substring(34,44));
+		msg = msg.substring(44);
+		list.add(msg.substring(44,56));
+		msg = msg.substring(56);
+		list.add(msg.substring(56,66));
+		msg = msg.substring(66);
+		list.add(msg.substring(66,72));
+		msg = msg.substring(72);
+		list.add(msg.substring(72,82));
+		msg = msg.substring(82);
+		list.add(msg.substring(82,88));
+		msg = msg.substring(88);
+		list.add(msg.substring(88,98));
+		msg = msg.substring(98);
+		list.add(msg.substring(98,104));
+		msg = msg.substring(104);
+		list.add(msg.substring(104,114));
+		msg = msg.substring(114);
+		list.add(msg.substring(114,120));
+		msg = msg.substring(120);
+		list.add(msg.substring(120,130));
+		msg = msg.substring(130);
+		list.add(msg.substring(130,139));
+		msg = msg.substring(139);
+		list.add(msg.substring(139,148));
+		msg = msg.substring(148);
+		list.add(msg.substring(148,161));
+		msg = msg.substring(161);
+		list.add(msg.substring(161,175));
+		msg = msg.substring(175);
+		list.add(msg.substring(175,192));
+		msg = msg.substring(192);
+		list.add(msg.substring(192,194));
+		msg = msg.substring(194);
+		list.add(msg.substring(194,195));
+		msg = msg.substring(195);
+		list.add(msg.substring(195,196));
+		msg = msg.substring(196);
+		list.add(msg.substring(196,203));
+		msg = msg.substring(203);
+		list.add(msg.substring(203,204));
+		msg = msg.substring(204);
+		list.add(msg.substring(204,210));
+		msg = msg.substring(210);
+		list.add(msg.substring(210,211));
+		msg = msg.substring(211);
+		list.add(msg.substring(211,218));
+		msg = msg.substring(218);
+		list.add(msg.substring(218,219));
+		msg = msg.substring(219);
+		list.add(msg.substring(219,227));
+		msg = msg.substring(227);
+		list.add(msg.substring(227,228));
+		msg = msg.substring(228);
+		list.add(msg.substring(228,240));
+		msg = msg.substring(240);
+		list.add(msg.substring(240,246));
+		msg = msg.substring(246);
+		list.add(msg.substring(246,252));
+		msg = msg.substring(252);
+		list.add(msg.substring(252,255));
+		msg = msg.substring(255);
+		list.add(msg.substring(255,258));
+		msg = msg.substring(258);
+		list.add(msg.substring(258,259));
+		msg = msg.substring(259);
+		list.add(msg.substring(259,260));
+		msg = msg.substring(260);
+		list.add(msg.substring(260,261));
+		msg = msg.substring(261);
+		list.add(msg.substring(261,269));
+		msg = msg.substring(269);
+		list.add(msg.substring(269,270));
+		msg = msg.substring(270);
+		list.add(msg.substring(270,273));
+		msg = msg.substring(273);
+		list.add(msg.substring(273,274));
+		msg = msg.substring(274);
+		list.add(msg.substring(274,275));
+		msg = msg.substring(275);
+		list.add(msg.substring(275,276));
+		msg = msg.substring(276);
+		list.add(msg.substring(276,279));
+		msg = msg.substring(279);
+		list.add(msg.substring(279,280));
+		msg = msg.substring(280);
+		list.add(msg.substring(280,281));
+		msg = msg.substring(281);
+		list.add(msg.substring(281,282));
+		msg = msg.substring(282);
+		list.add(msg.substring(282,283));
+		msg = msg.substring(283);
+		list.add(msg.substring(283,313));
+		msg = msg.substring(313);
+		list.add(msg.substring(313,343));
+		msg = msg.substring(343);
+		list.add(msg.substring(343,373));
+		msg = msg.substring(373);
+		list.add(msg.substring(373,379));
+		msg = msg.substring(379);
+		list.add(msg.substring(379,383));
+		msg = msg.substring(383);
+		list.add(msg.substring(383,384));
+		msg = msg.substring(384);
+		list.add(msg.substring(384,385));
+		msg = msg.substring(385);
+		list.add(msg.substring(385,394));
+		msg = msg.substring(394);
+		list.add(msg.substring(394,397));
+		msg = msg.substring(397);
+		list.add(msg.substring(397,400));
+		msg = msg.substring(400);
+		list.add(msg.substring(400,417));
+		msg = msg.substring(417);
+		list.add(msg.substring(417,434));
+		msg = msg.substring(434);
+		list.add(msg.substring(434,455));
+		msg = msg.substring(455);
+		list.add(msg.substring(455,456));
+		msg = msg.substring(456);
+		list.add(msg.substring(456,464));
+		msg = msg.substring(464);
+		list.add(msg.substring(464,472));
+		msg = msg.substring(472);
+		list.add(msg.substring(472,480));
+		msg = msg.substring(480);
+		list.add(msg.substring(480,488));
+		msg = msg.substring(488);
+		list.add(msg.substring(488,496));
+		msg = msg.substring(496);
+		list.add(msg.substring(496,504));
+		msg = msg.substring(504);
+		list.add(msg.substring(504,512));
+		msg = msg.substring(512);
+		list.add(msg.substring(512,515));
+		msg = msg.substring(515);
+		list.add(msg.substring(515,523));
+		msg = msg.substring(523);
+		list.add(msg.substring(523,540));
+		msg = msg.substring(540);
+		list.add(msg.substring(540,555));
+		msg = msg.substring(555);
+		list.add(msg.substring(555,563));
+		msg = msg.substring(563);
+		list.add(msg.substring(563,580));
+		msg = msg.substring(580);
+		list.add(msg.substring(580,581));
+		msg = msg.substring(581);
+		list.add(msg.substring(581,596));
+		msg = msg.substring(596);
+		list.add(msg.substring(596,611));
+		msg = msg.substring(611);
+		list.add(msg.substring(611,626));
+		msg = msg.substring(626);
+		list.add(msg.substring(626,641));
+		msg = msg.substring(641);
+		list.add(msg.substring(641,656));
+		msg = msg.substring(656);
+		list.add(msg.substring(656,671));
+		msg = msg.substring(671);
+		list.add(msg.substring(671,686));
+		msg = msg.substring(686);
+		list.add(msg.substring(686,701));
+		msg = msg.substring(701);
+		list.add(msg.substring(701,716));
+		msg = msg.substring(716);
+		list.add(msg.substring(716,731));
+		msg = msg.substring(731);
+		list.add(msg.substring(731,746));
+		msg = msg.substring(746);
+		list.add(msg.substring(746,761));
+		msg = msg.substring(761);
+		list.add(msg.substring(761,776));
+		msg = msg.substring(776);
+		list.add(msg.substring(776,791));
+		msg = msg.substring(791);
+		list.add(msg.substring(791,806));
+		msg = msg.substring(806);
+		list.add(msg.substring(806,821));
+		msg = msg.substring(821);
+		list.add(msg.substring(821,836));
+		msg = msg.substring(836);
+		list.add(msg.substring(836,851));
+		msg = msg.substring(851);
+		
+		  list.add(msg.substring(851,866));
+		  msg = msg.substring(866);
+
+		  list.add(msg.substring(866,881));
+		  msg = msg.substring(881);
+
+		  list.add(msg.substring(881,898));
+		  msg = msg.substring(898);
+
+		  list.add(msg.substring(898,899));
+		  msg = msg.substring(899);
+
+		  list.add(msg.substring(899,900));
+		  msg = msg.substring(900);
+
+		  list.add(msg.substring(900,901));
+		  msg = msg.substring(901);
+
+		  list.add(msg.substring(901,902));
+		  msg = msg.substring(902);
+
+		  list.add(msg.substring(902,903));
+		  msg = msg.substring(903);
+
+		  list.add(msg.substring(903,904));
+		  msg = msg.substring(904);
+
+		  list.add(msg.substring(904,905));
+		  msg = msg.substring(905);
+
+		  list.add(msg.substring(905,911));
+		  msg = msg.substring(911);
+
+		  list.add(msg.substring(911,912));
+		  msg = msg.substring(912);
+
+		  list.add(msg.substring(912,913));
+		  msg = msg.substring(913);
+
+		  list.add(msg.substring(913,914));
+		  msg = msg.substring(914);
+
+		  list.add(msg.substring(914,915));
+		  msg = msg.substring(915);
+
+		  list.add(msg.substring(915,921));
+		  msg = msg.substring(921);
+
+		  list.add(msg.substring(921,929));
+		  msg = msg.substring(929);
+
+		  list.add(msg.substring(929,940));
+		  msg = msg.substring(940);
+
+		  list.add(msg.substring(940,952));
+		  msg = msg.substring(952);
+
+		  list.add(msg.substring(952,960));
+		  msg = msg.substring(960);
+
+		  list.add(msg.substring(960,968));
+		  msg = msg.substring(968);
+
+		  list.add(msg.substring(968,976));
+		  msg = msg.substring(976);
+
+		  list.add(msg.substring(976,977));
+		  msg = msg.substring(977);
+
+		  list.add(msg.substring(977,987));
+		  msg = msg.substring(987);
+
+		  list.add(msg.substring(987,995));
+		  msg = msg.substring(995);
+
+		  list.add(msg.substring(995,1009));
+		  msg = msg.substring(1009);
+
+		  list.add(msg.substring(1009,1010));
+		  msg = msg.substring(1010);
+
+		  list.add(msg.substring(1010,1013));
+		  msg = msg.substring(1013);
+
+		  list.add(msg.substring(1013,1026));
+		  msg = msg.substring(1026);
+
+		  list.add(msg.substring(1026,1043));
+		  msg = msg.substring(1043);
+
+		  list.add(msg.substring(1043,1060));
+		  msg = msg.substring(1060);
+
+		  list.add(msg.substring(1060,1068));
+		  msg = msg.substring(1068);
+
+		  list.add(msg.substring(1068,1076));
+		  msg = msg.substring(1076);
+
+		  list.add(msg.substring(1076,1096));
+		  msg = msg.substring(1096);
+
+		  list.add(msg.substring(1096,1110));
+		  msg = msg.substring(1110);
+
+		  list.add(msg.substring(1110,1116));
+		  msg = msg.substring(1116);
+
+		  list.add(msg.substring(1116,1117));
+		  msg = msg.substring(1117);
+
+		  list.add(msg.substring(1117,1129));
+		  msg = msg.substring(1129);
+
+		  list.add(msg.substring(1129,1131));
+		  msg = msg.substring(1131);
+
+		  list.add(msg.substring(1131,1139));
+		  msg = msg.substring(1139);
+
+		  list.add(msg.substring(1139,1141));
+		  msg = msg.substring(1141);
+
+		  list.add(msg.substring(1141,1147));
+		  msg = msg.substring(1147);
+
+		  list.add(msg.substring(1147,1148));
+		  msg = msg.substring(1148);
+
+		  list.add(msg.substring(1148,1156));
+		  msg = msg.substring(1156);
+
+		  list.add(msg.substring(1156,1172));
+		  msg = msg.substring(1172);
+
+		  list.add(msg.substring(1172,1180));
+		  msg = msg.substring(1180);
+
+		  list.add(msg.substring(1180,1188));
+		  msg = msg.substring(1188);
+
+		  list.add(msg.substring(1188,1209));
+		  msg = msg.substring(1209);
+
+		  list.add(msg.substring(1209,1210));
+		  msg = msg.substring(1210);
+
+		return list;
+		
+	}
+
+
