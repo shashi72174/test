@@ -1,0 +1,1124 @@
+CREATE OR REPLACE PACKAGE SFTR.pkg_msg_format AS
+
+  /* TODO enter package declarations (types, exceptions, methods etc) here */
+
+  --Global variable declarations
+
+  gv_package_name VARCHAR2(100) := 'PKG_MSG_FORMAT';
+
+  --TYPE gr_stmt_insert
+
+  --IS
+
+  --  RECORD
+
+  --  (
+
+  --    msg_sq sftr.idm_stage_loan.msg_sq%TYPE,
+
+  --    msg_record_no sftr.idm_stage_loan.msg_record_no%TYPE,
+
+  --    stmt_insert CLOB );
+
+  --TYPE gcol_stmt_insert
+
+  --IS
+
+  --  TABLE OF gr_stmt_insert;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_VALIDATE  :: This procedure retrieving the source and subtype for all the messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_validate(pi_msg_sq           INTEGER,
+
+                        pi_msg_clob         CLOB,
+
+                        pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                        pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                        pi_calendar_dt      sftr.idm_job.calendar_dt%TYPE,
+
+                        po_status_flg       OUT VARCHAR2,
+
+                        po_records_inserted OUT INTEGER,
+
+                        po_records_updated  OUT INTEGER,
+
+                        po_records_rejected OUT INTEGER,
+
+                        po_step_log_txt     OUT VARCHAR2);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_SPLIT_PARSE :: This procedue split header and detailed records and trgigger the stage and core loading process ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_split_parse(pi_msg_sq           INTEGER,
+
+                           pi_msg_clob         CLOB,
+
+                           pi_msg_source       sftr.idm_status.idm_source%TYPE,
+
+                           pi_msg_subtype      sftr.idm_status.idm_subtype%TYPE,
+
+                           pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                           pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                           pi_calendar_dt      sftr.idm_job.calendar_dt%TYPE,
+
+                           po_status_flg       OUT VARCHAR2,
+
+                           po_records_inserted OUT INTEGER,
+
+                           po_records_updated  OUT INTEGER,
+
+                           po_records_rejected OUT INTEGER,
+
+                           po_step_log_txt     OUT VARCHAR2);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_FIXED :: This procedure performs the staging and core load process for fixed format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_fixed(pi_format_id     INTEGER,
+
+                          pi_msg_sq        INTEGER,
+
+                          pi_msg_record_no INTEGER,
+
+                          pi_msg_record    VARCHAR2,
+
+                          pi_calendar_dt   DATE,
+
+                          pi_tgt_table_nm  VARCHAR2,
+
+                          pi_job_id        sftr.idm_job.job_id%TYPE,
+
+                          pi_debug_flg     sftr.idm_job.debug_flg%TYPE);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_DELIMITED :: This procedure performs the staging and core load process for delimeted format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_delimited(pi_format_id INTEGER);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_XML :: This procedure performs the staging and core load process for delimeted format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_xml(pi_format_id INTEGER);
+
+END pkg_msg_format;
+/
+CREATE OR REPLACE PACKAGE BODY SFTR.pkg_msg_format AS
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_VALIDATE  :: This procedure retrieving the source and subtype for all the messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_validate(pi_msg_sq           INTEGER,
+
+                        pi_msg_clob         CLOB,
+
+                        pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                        pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                        pi_calendar_dt      sftr.idm_job.calendar_dt%TYPE,
+
+                        po_status_flg       OUT VARCHAR2,
+
+                        po_records_inserted OUT INTEGER,
+
+                        po_records_updated  OUT INTEGER,
+
+                        po_records_rejected OUT INTEGER,
+
+                        po_step_log_txt     OUT VARCHAR2) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_VALIDATE';
+
+    lv_record_string    VARCHAR2(32767);
+
+    lv_idm_subtype_data VARCHAR2(10);
+
+    lv_idm_source_data  VARCHAR2(10);
+
+    lv_format_id        sftr.msg_format.format_id%TYPE;
+
+  BEGIN
+
+    --Processimng all the header records to find the format (source and msg subtype)
+
+    FOR fmt IN (SELECT format_id,
+
+                       format_type_flg,
+
+                       format_target_nm,
+
+                       start_at,
+
+                       record_length,
+
+                       idm_source_nm,
+
+                       idm_subtype
+
+                  FROM sftr.msg_format
+
+                 WHERE format_cd = 'H') LOOP
+
+      -- If debug_flg='Y' then the step and corresponding log messages will be inserted to sftr.debug_messages table
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Getting IDM source and subtype for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                       ' format_id-' || fmt.format_id;
+
+        --Procedure logs the messages into sftr.debug_messages table...
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                       p_program     => lv_prog_name,
+
+                       p_calendar_dt => pi_calendar_dt,
+
+                       p_message     => 'Debug Line-' || lv_line_num ||
+
+                                        ' Debug Message: ' || lv_step,
+
+                       p_job_id      => pi_job_id);
+
+      END IF;
+
+      --Retrieving the source and subtype for Fixed format messages
+
+      IF fmt.format_type_flg = 'F' THEN
+
+        lv_record_string := SUBSTR(pi_msg_clob,
+
+                                   fmt.start_at,
+
+                                   fmt.record_length);
+
+        SELECT MAX(DECODE(column_NM,
+
+                          fmt.idm_source_nm,
+
+                          SUBSTR(lv_record_string, start_at, data_length))) AS idm_source,
+
+               MAX(DECODE(column_NM,
+
+                          fmt.idm_subtype,
+
+                          SUBSTR(lv_record_string, start_at, data_length))) AS idm_subtype
+
+          INTO lv_idm_source_data, lv_idm_subtype_data
+
+          FROM sftr.msg_fields_fixed_format
+
+         WHERE format_id = fmt.format_id
+
+           AND column_nm IN (fmt.idm_source_nm, fmt.idm_subtype);
+
+      END IF;
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Getting IDM source and subtype from IDM_FORMAT_MAPPING for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                       ' format_id-' || fmt.format_id;
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                       p_program     => lv_prog_name,
+
+                       p_calendar_dt => pi_calendar_dt,
+
+                       p_message     => 'Debug Line-' || lv_line_num ||
+
+                                        ' Debug Message: ' || lv_step,
+
+                       p_job_id      => pi_job_id);
+
+      END IF;
+
+      --Retrieving the source and subtype for Delimeted messages
+
+      IF fmt.format_type_flg = 'D' THEN
+
+        NULL; --Implementation is yet to start ...
+
+      END IF;
+
+      --Retrieving the source and subtype for XML messages
+
+      IF fmt.format_type_flg = 'X' THEN
+
+        NULL; --Implementation is yet to start ...
+
+      END IF;
+
+      --Message header should return both Source and subtype
+
+      IF (lv_idm_source_data IS NOT NULL AND
+
+         lv_idm_subtype_data IS NOT NULL) THEN
+
+        EXIT; --exit the loop after finding the source and sub type ...
+
+      END IF;
+
+    END LOOP;
+
+    BEGIN
+
+      SELECT DISTINCT idm_source, idm_format
+
+      --COUNT(format_id)
+
+        INTO lv_idm_source_data, lv_idm_subtype_data
+
+      --  INTO lv_format_cnt
+
+        FROM sftr.idm_format_mapping
+
+       WHERE idm_source = lv_idm_source_data
+
+         AND idm_format = lv_idm_subtype_data;
+
+    EXCEPTION
+
+      WHEN NO_DATA_FOUND THEN
+
+        lv_idm_source_data  := NULL;
+
+        lv_idm_subtype_data := NULL;
+
+    END;
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Updating IDM source and subtype to IDM_STATUS for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq || ' format_id-' ||
+
+                     lv_format_id;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    --Updating the source and sub type to IDM_STATUS tables ...
+
+    UPDATE sftr.idm_status
+
+       SET status_flg  = 'S',
+
+           idm_source  = lv_idm_source_data,
+
+           idm_subtype = lv_idm_subtype_data
+
+           --modified_by = USER,
+
+           --modified_dt = TO_DATE(TO_CHAR(CURRENT_DATE, 'RRRRMMDDHH24MISS'),
+
+                                 --'RRRRMMDDHH24MISS')  #CHIRU#
+
+     WHERE msg_sq = pi_msg_sq
+
+       AND lv_idm_source_data IS NOT NULL
+
+       AND lv_idm_subtype_data IS NOT NULL;
+
+
+
+    po_records_updated := SQL%ROWCOUNT;
+
+
+
+      po_status_flg       := 'S';
+
+      po_records_inserted := 0;
+
+      po_records_rejected := 0;
+
+      po_step_log_txt     := 'Success';
+
+
+
+    IF po_records_updated = 0 THEN
+
+      po_status_flg       := 'F';
+
+      po_records_inserted := 0;
+
+      po_records_rejected := 0;
+
+      po_step_log_txt     := 'Fail';
+
+      --If no source or subtype found then fail the process with 'F' status in IDM_STATUS
+
+      UPDATE sftr.idm_status
+
+         SET status_flg  = 'F'
+
+             --modified_by = USER,
+
+             --modified_dt = TO_DATE(TO_CHAR(CURRENT_DATE, 'RRRRMMDDHH24MISS'),
+
+                                   --'RRRRMMDDHH24MISS') #CHIRU#
+
+       WHERE msg_sq = pi_msg_sq;
+
+--    ELSE
+
+
+
+      --Added status update condition for 'S' #CHIRU#
+
+--      UPDATE sftr.idm_status
+
+--         SET status_flg  = 'S'--,
+
+--             --modified_by = USER,
+
+--            -- modified_dt = TO_DATE(TO_CHAR(CURRENT_DATE, 'RRRRMMDDHH24MISS'),
+
+--                                  -- 'RRRRMMDDHH24MISS')
+
+--       WHERE msg_sq = pi_msg_sq;
+
+    END IF;
+
+    COMMIT;
+
+    --    END LOOP;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      ROLLBACK;
+
+      po_status_flg       := 'F';
+
+      po_records_inserted := 0;
+
+      po_records_updated  := 0;
+
+      po_records_rejected := 0;
+
+      po_step_log_txt     := 'Fail-' || ' Error Trapped... ' || SQLCODE || '.' ||
+
+                             SQLERRM;
+
+      lv_line_num         := $$plsql_line;
+
+      lv_step             := 'MSG validation fialed for job id-' ||
+
+                             pi_job_id || ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step ||
+
+                                      ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                      SQLERRM,
+
+                     p_job_id      => pi_job_id);
+
+  END sp_validate;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_SPLIT_PARSE :: This procedue split header and detailed records and trgigger the stage and core loading process ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_split_parse(pi_msg_sq           INTEGER,
+
+                           pi_msg_clob         CLOB,
+
+                           pi_msg_source       sftr.idm_status.idm_source%TYPE,
+
+                           pi_msg_subtype      sftr.idm_status.idm_subtype%TYPE,
+
+                           pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                           pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                           pi_calendar_dt      sftr.idm_job.calendar_dt%TYPE,
+
+                           po_status_flg       OUT VARCHAR2,
+
+                           po_records_inserted OUT INTEGER,
+
+                           po_records_updated  OUT INTEGER,
+
+                           po_records_rejected OUT INTEGER,
+
+                           po_step_log_txt     OUT VARCHAR2) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_SPLIT_PARSE';
+
+    lv_record_string        VARCHAR2(32767);
+
+    lv_msg_record_no        INTEGER := 1;
+
+    lv_msg_record_start_pos INTEGER;
+
+
+
+    --  lv_stmt_insert gcol_stmt_insert := gcol_stmt_insert();
+
+  BEGIN
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Message split and parse started for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    FOR fmt IN (SELECT ifm.format_id,
+
+                       mft.format_type_flg,
+
+                       mft.format_target_nm,
+
+                       mft.start_at,
+
+                       mft.record_length,
+
+                       mft.format_cd
+
+                  FROM sftr.idm_format_mapping ifm
+
+                  JOIN sftr.msg_format mft
+
+                    ON (ifm.format_id = mft.format_id AND
+
+                       idm_source = pi_msg_source AND
+
+                       idm_format = pi_msg_subtype)) LOOP
+
+      IF fmt.format_type_flg = 'F' THEN
+
+        --For Fixed length Messages
+
+        IF fmt.format_cd = 'H' THEN
+
+          --For header
+
+          lv_record_string := SUBSTR(pi_msg_clob,
+
+                                     fmt.start_at,
+
+                                     fmt.record_length); -- extracting the header from CLOB
+
+          IF pi_debug_flg = 'Y' THEN
+
+            lv_line_num := $$plsql_line;
+
+            lv_step     := 'Procedure PKG_MSG_FORMAT.SP_LOAD_FIXED call for fixed formate header load for job id-' ||
+
+                           pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                           ' format_id-' || fmt.format_id;
+
+            sftr.sp_log_message(p_application => 'SFTR',
+
+                           p_program     => lv_prog_name,
+
+                           p_calendar_dt => pi_calendar_dt,
+
+                           p_message     => 'Debug Line-' || lv_line_num ||
+
+                                            ' Debug Message: ' || lv_step,
+
+                           p_job_id      => pi_job_id);
+
+          END IF;
+
+          --Call stage loading proceduerfor Fixed format messages ...
+
+          sftr.pkg_msg_format.sp_load_fixed(pi_format_id     => fmt.format_id,
+
+                                            pi_msg_sq        => pi_msg_sq,
+
+                                            pi_msg_record_no => lv_msg_record_no,
+
+                                            pi_msg_record    => lv_record_string,
+
+                                            pi_calendar_dt   => pi_calendar_dt,
+
+                                            pi_tgt_table_nm  => fmt.format_target_nm,
+
+                                            pi_job_id        => pi_job_id,
+
+                                            pi_debug_flg     => pi_debug_flg);
+
+        ELSE
+
+          --else processing detailed record
+
+          IF pi_debug_flg = 'Y' THEN
+
+            lv_line_num := $$plsql_line;
+
+            lv_step     := 'Procedure PKG_MSG_FORMAT.SP_LOAD_FIXED call for fixed formate data record load for job id-' ||
+
+                           pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                           ' format_id-' || fmt.format_id;
+
+            sftr.sp_log_message(p_application => 'SFTR',
+
+                           p_program     => lv_prog_name,
+
+                           p_calendar_dt => pi_calendar_dt,
+
+                           p_message     => 'Debug Line-' || lv_line_num ||
+
+                                            ' Debug Message: ' || lv_step,
+
+                           p_job_id      => pi_job_id);
+
+          END IF;
+
+          LOOP
+
+            IF lv_msg_record_no = 1 THEN
+
+              lv_msg_record_start_pos := fmt.start_at;
+
+            ELSE
+
+              lv_msg_record_start_pos := lv_msg_record_start_pos +
+
+                                         fmt.record_length;
+
+            END IF;
+
+            lv_record_string := SUBSTR(pi_msg_clob,
+
+                                       lv_msg_record_start_pos,
+
+                                       fmt.record_length); --Extracting each message from CLOB
+
+            EXIT WHEN lv_record_string IS NULL;
+
+            --PROCEDURE CALL to load Fixed format messages ...
+
+            sftr.pkg_msg_format.sp_load_fixed(pi_format_id     => fmt.format_id,
+
+                                              pi_msg_sq        => pi_msg_sq,
+
+                                              pi_msg_record_no => lv_msg_record_no,
+
+                                              pi_msg_record    => lv_record_string,
+
+                                              pi_calendar_dt   => pi_calendar_dt,
+
+                                              pi_tgt_table_nm  => fmt.format_target_nm,
+
+                                              pi_job_id        => pi_job_id,
+
+                                              pi_debug_flg     => pi_debug_flg);
+
+            lv_msg_record_no := lv_msg_record_no + 1;
+
+          END LOOP;
+
+        END IF;
+
+      END IF;
+
+
+
+    --Yet to start the implemetation for the delimeted and XML messages
+
+    /*IF fmt.format_type_flg = 'D' THEN
+
+          END IF;
+
+          IF fmt.format_type_flg = 'X' THEN
+
+          END IF;*/
+
+    END LOOP;
+
+    COMMIT;
+
+    po_status_flg       := 'S';
+
+    po_records_inserted := lv_msg_record_no;
+
+    po_records_updated  := 0;
+
+    po_records_rejected := 0;
+
+    po_step_log_txt     := 'Success';
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Message split and parse End for job id-' || pi_job_id ||
+
+                     ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      ROLLBACK;
+
+      po_status_flg       := 'F';
+
+      po_records_inserted := 0;
+
+      po_records_updated  := 0;
+
+      po_records_rejected := 0;
+
+      po_step_log_txt     := 'Fail-' || ' Error Trapped... ' || SQLCODE || '.' ||
+
+                             SQLERRM;
+
+      lv_line_num         := $$plsql_line;
+
+      lv_step             := 'Message message deconstuction fialed for job id-' ||
+
+                             pi_job_id || ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step ||
+
+                                      ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                      SQLERRM,
+
+                     p_job_id      => pi_job_id);
+
+  END sp_split_parse;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_FIXED :: This procedure performs the staging and core load process for fixed format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_fixed(pi_format_id     INTEGER,
+
+                          pi_msg_sq        INTEGER,
+
+                          pi_msg_record_no INTEGER,
+
+                          pi_msg_record    VARCHAR2,
+
+                          pi_calendar_dt   DATE,
+
+                          pi_tgt_table_nm  VARCHAR2,
+
+                          pi_job_id        sftr.idm_job.job_id%TYPE,
+
+                          pi_debug_flg     sftr.idm_job.debug_flg%TYPE) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_LOAD_FIXED';
+
+    lv_delete_stmt      VARCHAR2(32767);
+
+    lv_columns          VARCHAR2(32767);
+
+    lv_insert_clause    VARCHAR2(32767);
+
+    lv_columns_data     VARCHAR2(32767);
+
+    lv_value_clause     VARCHAR2(32767);
+
+    lv_add_columns      VARCHAR2(4000);
+
+    lv_add_columns_data VARCHAR2(4000);
+
+    lv_user             VARCHAR2(100) := '''' || USER || '''';
+
+    lv_current_dt       VARCHAR2(100) := 'TO_DATE(' ||
+
+                                         TO_CHAR(CURRENT_DATE,
+
+                                                 'RRRRMMDDHH24MISS') || ', ' ||
+
+                                         '''RRRRMMDDHH24MISS''' || ')';
+
+    lv_calendar_dt      VARCHAR2(100) := 'TO_DATE(' ||
+
+                                         TO_CHAR(pi_calendar_dt,
+
+                                                 'RRRRMMDDHH24MISS') || ', ' ||
+
+                                         '''RRRRMMDDHH24MISS''' || ')';
+
+
+
+    --  lv_stmt_insert gcol_stmt_insert := gcol_stmt_insert();
+
+  BEGIN
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Preparing Delete Statement for table' ||
+
+                     pi_tgt_table_nm || ' for job id-' || pi_job_id ||
+
+                     ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    --Delete the records from table before loading the records for each message sequence ...
+
+    IF pi_msg_record_no = 1 THEN
+
+      --Prepare delete statement
+
+      lv_delete_stmt := 'DELETE FROM SFTR.' || pi_tgt_table_nm ||
+
+                        ' WHERE msg_sq = ' || pi_msg_sq;
+
+      EXECUTE IMMEDIATE lv_delete_stmt;
+
+    END IF;
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Getting Columns and Columns data from MSG_FIELDS_FIXED_FORMAT for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    --Prepare insert statement
+
+    --Limitation - If record length is more than 4000 characters, this approach fials and the below statement has to change
+
+    SELECT LISTAGG(column_nm, ',') WITHIN GROUP(ORDER BY column_id) AS cols,
+
+           LISTAGG('''' || SUBSTR(pi_msg_record, start_at, data_length) || '''',
+
+                   ',') WITHIN GROUP(ORDER BY column_id) AS cols_data
+
+      INTO lv_columns, lv_columns_data
+
+      FROM sftr.msg_fields_fixed_format
+
+     WHERE format_id = pi_format_id
+
+       AND data_flg = 'Y';
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Getting Additional Columns and Columns data from MSG_FIELDS_FIXED_FORMAT for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    --Additional columns
+
+    SELECT LISTAGG(column_nm, ',') WITHIN GROUP(ORDER BY column_id) AS cols,
+
+           LISTAGG(DECODE(column_nm,
+
+                          'MSG_SQ',
+
+                          TO_CHAR(pi_msg_sq),
+
+                          'MSG_RECORD_NO',
+
+                          TO_CHAR(pi_msg_record_no),
+
+                          'CALENDAR_DT',
+
+                          lv_calendar_dt,
+
+                          'LAST_MOD_SIGNON_ID',
+
+                          lv_user,
+
+                          'LAST_MOD_DATE_TIME',
+
+                          lv_current_dt,
+
+                          NULL),
+
+                   ',') WITHIN GROUP(ORDER BY column_id) AS cols_data
+
+      INTO lv_add_columns, lv_add_columns_data
+
+      FROM sftr.msg_fields_fixed_format
+
+     WHERE format_id = pi_format_id
+
+       AND data_flg = 'N';
+
+    lv_insert_clause := 'INSERT INTO SFTR.' || pi_tgt_table_nm || '(' ||
+
+                        lv_columns || ',' || lv_add_columns || ')';
+
+    lv_value_clause := ' VALUES (' || lv_columns_data || ',' ||
+
+                       lv_add_columns_data || ')';
+
+    EXECUTE IMMEDIATE lv_insert_clause || ' ' || lv_value_clause;
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'End of fixed format load for job id-' || pi_job_id ||
+
+                     ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step,
+
+                     p_job_id      => pi_job_id);
+
+    END IF;
+
+    --      COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Fixed format load failed for job id-' || pi_job_id ||
+
+                     ' msg_sq-' || pi_msg_sq;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                     p_program     => lv_prog_name,
+
+                     p_calendar_dt => pi_calendar_dt,
+
+                     p_message     => 'Debug Line-' || lv_line_num ||
+
+                                      ' Debug Message: ' || lv_step ||
+
+                                      ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                      SQLERRM,
+
+                     p_job_id      => pi_job_id);
+
+  END sp_load_fixed;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_DELIMITED :: This procedure performs the staging and core load process for delimeted format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_delimited(pi_format_id INTEGER) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_LOAD_DELIMITED';
+
+  BEGIN
+
+    -- TODO: Implementation required for PROCEDURE PKG_MSG.sp_load_delimited_format
+
+    NULL;
+
+  END sp_load_delimited;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_LOAD_XML :: This procedure performs the staging and core load process for delimeted format messages ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_load_xml(pi_format_id INTEGER) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_LOAD_XML';
+
+  BEGIN
+
+    -- TODO: Implementation required for PROCEDURE PKG_MSG.sp_load_xml_format
+
+    NULL;
+
+  END sp_load_xml;
+
+END pkg_msg_format;
+/

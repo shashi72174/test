@@ -1,0 +1,1791 @@
+CREATE OR REPLACE PACKAGE SFTR.PKG_IDM AS
+
+  /* TODO enter package declarations (types, exceptions, methods etc) here */
+
+  --Global variable declarations
+
+  gv_package_name VARCHAR2(100) := 'PKG_IDM';
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_JOB_STEP_STATUS_UPDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to populate the idm_job_step_status table
+
+  PROCEDURE sp_job_step_status_update(pi_job_id           sftr.idm_job_step_status.job_id%TYPE,
+
+                                      pi_calendar_dt      sftr.idm_job_step_status.calendar_dt%TYPE,
+
+                                      pi_msg_sq           sftr.idm_job_step_status.msg_sq%TYPE,
+
+                                      pi_job_step_id      sftr.idm_job_step_status.job_step_id%TYPE,
+
+                                      pi_start_dt         sftr.idm_job_step_status.start_dt%TYPE,
+
+                                      pi_end_dt           sftr.idm_job_step_status.end_dt%TYPE,
+
+                                      pi_records_inserted sftr.idm_job_step_status.records_inserted%TYPE,
+
+                                      pi_records_updated  sftr.idm_job_step_status.records_updated%TYPE,
+
+                                      pi_records_rejected sftr.idm_job_step_status.records_rejected%TYPE,
+
+                                      pi_step_status_flg  sftr.idm_job_step_status.step_status_flg%TYPE,
+
+                                      pi_step_log_txt     sftr.idm_job_step_status.step_log_txt%TYPE,
+
+                                      pi_debug_flg        sftr.idm_job.debug_flg%TYPE);
+
+
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_STATUS_UPDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to update status_flg to P from N status_flg & populate the msg_sq value using function fn_get_msg_sq for IDM_STATUS table.
+
+  PROCEDURE sp_status_update(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                             pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                             pi_calendar_dt DATE
+
+                             --                             pi_update_flg  INTEGER,
+
+                             --                             pi_status_flg  VARCHAR2,
+
+                             --                             pi_msg_sq sftr.idm_status.msg_sq%TYPE
+
+                             );
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_VALIDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  --Procedure to Identifying IDM format - Fixed/Delimited/XML
+
+  PROCEDURE sp_validate(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                        pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                        pi_calendar_dt DATE);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_STAGE_LOAD
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to split the message based on meta data & load into stage table IDM_STAGE_LOAN
+
+  PROCEDURE sp_stage_load(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                          pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                          pi_calendar_dt DATE);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- FN_GET_OIR_INVENTORY_DET
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to lookup the isin_id, sedol_id & security_sq
+
+  FUNCTION fn_get_oir_inventory_det(pi_cusip_id  VARCHAR2,
+
+                                    pi_column_nm VARCHAR2) RETURN VARCHAR2;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_POP_IDM_LOAN
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to populate the core table IDM_LOAN
+
+  PROCEDURE sp_pop_idm_loan(pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                            pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                            pi_calendar_dt      DATE,
+
+                            pi_msg_sq           sftr.idm_loan.msg_sq%TYPE,
+
+                            pi_msg_record_no    sftr.idm_loan.msg_record_no%TYPE,
+
+                            po_status_flg       OUT VARCHAR2,
+
+                            po_records_inserted OUT INTEGER,
+
+                            po_records_updated  OUT INTEGER,
+
+                            po_records_rejected OUT INTEGER,
+
+                            po_step_log_txt     OUT VARCHAR2);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_ENRICH_XREF_LOAD
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_enrich_xref_load(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                                pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                                pi_calendar_dt DATE);
+
+END PKG_IDM;
+/
+CREATE OR REPLACE PACKAGE BODY SFTR.PKG_IDM AS
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_JOB_STEP_STATUS_UPDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to populate the idm_job_step_status table
+
+  PROCEDURE sp_job_step_status_update(pi_job_id           sftr.idm_job_step_status.job_id%TYPE, -- To specify the Landing to Stage to Core table load process job id i.e. IDLL
+
+                                      pi_calendar_dt      sftr.idm_job_step_status.calendar_dt%TYPE, -- Bussiness Date
+
+                                      pi_msg_sq           sftr.idm_job_step_status.msg_sq%TYPE, -- To uniquely identify the messages for each record
+
+                                      pi_job_step_id      sftr.idm_job_step_status.job_step_id%TYPE, -- To specify the each step of the core table load process
+
+                                      pi_start_dt         sftr.idm_job_step_status.start_dt%TYPE, -- To specify the start date of process
+
+                                      pi_end_dt           sftr.idm_job_step_status.end_dt%TYPE, --  To specify the end date of process
+
+                                      pi_records_inserted sftr.idm_job_step_status.records_inserted%TYPE, -- To specify the successfull records inserted
+
+                                      pi_records_updated  sftr.idm_job_step_status.records_updated%TYPE, -- To specify the successfull records updated
+
+                                      pi_records_rejected sftr.idm_job_step_status.records_rejected%TYPE, -- -- To specify the successfull records rejected
+
+                                      pi_step_status_flg  sftr.idm_job_step_status.step_status_flg%TYPE, -- To identify the status of the process (P - Process, F - Failed, S - Success)
+
+                                      pi_step_log_txt     sftr.idm_job_step_status.step_log_txt%TYPE, -- To log the meaningful message for each process
+
+                                      pi_debug_flg        sftr.idm_job.debug_flg%TYPE) AS
+
+    -- To set the flag for debug is needed or not.
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_JOB_STEP_STATUS_UPDATE';
+
+    PRAGMA AUTONOMOUS_TRANSACTION; -- If load process failed anywhere in the package. It should log the details into the job table.
+
+  BEGIN
+
+    -- If the start_dt is not null then it should delete & insert into job step status table. Otherwise it should update job step status table
+
+    IF pi_start_dt IS NOT NULL THEN
+
+      -- If the debug flg Y to log the messages. Otherwise it won't log any debug messages.
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line; -- line number for the debug message
+
+        -- Detailed message for the debug log message
+
+        lv_step := 'Deleting data from IDM_JOB_STEP_STATUS for job id-' ||
+
+                   pi_job_id || ' msg_sq-' || pi_msg_sq || ' job_step_id-' ||
+
+                   pi_job_step_id;
+
+        -- Log the debug messages into debug_messages table.
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                            p_program     => lv_prog_name,
+
+                            p_calendar_dt => pi_calendar_dt,
+
+                            p_message     => 'Debug Line-' || lv_line_num ||
+
+                                             ' Debug Message: ' || lv_step,
+
+                            p_job_id      => pi_job_id);
+
+      END IF;
+
+      -- Deleting the data from the idm_job_step_status table based on the job_id & msg_sq
+
+      DELETE FROM sftr.idm_job_step_status
+
+       WHERE job_id = pi_job_id
+
+         AND msg_sq = pi_msg_sq
+
+         AND job_step_id = pi_job_step_id
+
+         AND TRUNC(calendar_dt) = TRUNC(pi_calendar_dt);
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Inserting data into IDM_JOB_STEP_STATUS for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                       ' job_step_id-' || pi_job_step_id;
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                            p_program     => lv_prog_name,
+
+                            p_calendar_dt => pi_calendar_dt,
+
+                            p_message     => 'Debug Line-' || lv_line_num ||
+
+                                             ' Debug Message: ' || lv_step,
+
+                            p_job_id      => pi_job_id);
+
+      END IF;
+
+      -- Populate the idm_job_step_status table
+
+      INSERT INTO sftr.idm_job_step_status
+
+        (job_id,
+
+         calendar_dt,
+
+         msg_sq,
+
+         job_step_id,
+
+         start_dt,
+
+         end_dt,
+
+         records_inserted,
+
+         records_updated,
+
+         records_rejected,
+
+         step_status_flg,
+
+         step_log_txt,
+
+         LAST_MOD_SIGNON_ID,
+
+         LAST_MOD_DATE_TIME)
+
+      VALUES
+
+        (pi_job_id,
+
+         pi_calendar_dt,
+
+         pi_msg_sq,
+
+         pi_job_step_id,
+
+         pi_start_dt,
+
+         pi_end_dt,
+
+         pi_records_inserted,
+
+         pi_records_updated,
+
+         pi_records_rejected,
+
+         pi_step_status_flg,
+
+         pi_step_log_txt,
+
+         USER,
+
+         CURRENT_DATE);
+
+    ELSE
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Updating data to IDM_JOB_STEP_STATUS for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq ||
+
+                       ' job_step_id-' || pi_job_step_id;
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                            p_program     => lv_prog_name,
+
+                            p_calendar_dt => pi_calendar_dt,
+
+                            p_message     => 'Debug Line-' || lv_line_num ||
+
+                                             ' Debug Message: ' || lv_step,
+
+                            p_job_id      => pi_job_id);
+
+      END IF;
+
+      -- Update the end_dt & how many records inserted, updated & rejected.
+
+      UPDATE sftr.idm_job_step_status
+
+         SET end_dt           = pi_end_dt,
+
+             records_inserted = pi_records_inserted,
+
+             records_updated  = pi_records_updated,
+
+             records_rejected = pi_records_rejected,
+
+             step_status_flg  = pi_step_status_flg,
+
+             step_log_txt     = step_log_txt || ':' || pi_step_log_txt
+
+      --modified_by      = USER,
+
+      --modified_dt      = TO_DATE(TO_CHAR(CURRENT_DATE,'RRRRMMDDHH24MISS'),'RRRRMMDDHH24MISS') #Commented by #CHIRU#
+
+       WHERE job_id = pi_job_id
+
+         AND msg_sq = pi_msg_sq
+
+         AND job_step_id = pi_job_step_id;
+
+    END IF;
+
+    COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      -- If the job step status failed then it should log the error messages.
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'IDM job step status fialed for job id-' || pi_job_id ||
+
+                     ' msg_sq-' || pi_msg_sq || ' job_step_id-' ||
+
+                     pi_job_step_id;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step ||
+
+                                           ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                           SQLERRM,
+
+                          p_job_id      => pi_job_id);
+
+      --RAISE;
+
+  END sp_job_step_status_update;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_STATUS_UPDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to update status_flg to P from N status_flg & populate the msg_sq value using function fn_get_msg_sq for IDM_STATUS table.
+
+  PROCEDURE sp_status_update(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                             pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                             pi_calendar_dt DATE
+
+                             --                             pi_update_flg  INTEGER,
+
+                             --                             pi_status_flg  VARCHAR2,
+
+                             --                             pi_msg_sq sftr.idm_status.msg_sq%TYPE
+
+                             ) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_STATUS_UPDATE';
+
+  BEGIN
+
+
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Updating STATUS_FLG and MSG_SQ to IDM_STATUS for job id-' ||
+
+                     pi_job_id;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step,
+
+                          p_job_id      => pi_job_id);
+
+    END IF;
+
+    --    IF pi_update_flg = 1 THEN
+
+    -- Update the status to P for processing & populate the msg_sq value based on condition for status_flg should be 'N' & msg_sq is null.
+
+    UPDATE sftr.idm_status
+
+       SET status_flg = 'P', msg_sq = sftr.fn_get_msg_sq()
+
+    --modified_by = USER,
+
+    --modified_dt =  TO_DATE(TO_CHAR(CURRENT_DATE,'RRRRMMDDHH24MISS'),'RRRRMMDDHH24MISS')  --Commneted by #CHIRU#
+
+     WHERE status_flg = 'N'
+
+       AND msg_sq IS NULL;
+
+    --    ELSE
+
+    --     UPDATE sftr.idm_status SET status_flg = pi_status_flg WHERE msg_sq = pi_msg_sq;
+
+    --    END IF;
+
+    COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'IDM status updation fialed for job id-' || pi_job_id;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step ||
+
+                                           ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                           SQLERRM,
+
+                          p_job_id      => pi_job_id);
+
+  END sp_status_update;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_VALIDATE
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  --Procedure to Identifying IDM format - Fixed/Delimited/XML
+
+  PROCEDURE sp_validate(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                        pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                        pi_calendar_dt DATE) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_VALIDATE';
+
+    lv_record_string VARCHAR2(32767);
+
+    --Job step status variables
+
+    lv_status_flg       VARCHAR2(1);
+
+    lv_records_inserted INTEGER;
+
+    lv_records_updated  INTEGER;
+
+    lv_records_rejected INTEGER;
+
+    lv_step_log_txt     VARCHAR2(4000);
+
+    --lv_job_step_id      NUMBER;
+
+  BEGIN
+
+    -- Loop for fetching the msg_seq & clob message from IDM_CLOB & IDM_STATUS table.
+
+    FOR idm IN (SELECT ids.msg_sq, clb.message
+
+                  FROM sftr.idm_status ids
+
+                  JOIN sftr.idm_clob clb
+
+                    ON (ids.mtex_msg_id = clb.mtex_msg_id
+					   )
+				 WHERE TRUNC(ids.calendar_dt) = TRUNC(pi_calendar_dt) AND
+
+                       ids.status_flg = 'P' AND
+
+					   ids.msg_sq IS NOT NULL
+					) LOOP
+
+      -- Procedure to populate the idm_job_step_status table
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 1,
+
+                                             pi_start_dt         => CURRENT_DATE,
+
+                                             pi_end_dt           => NULL,
+
+                                             pi_records_inserted => 0,
+
+                                             pi_records_updated  => 0,
+
+                                             pi_records_rejected => 0,
+
+                                             pi_step_status_flg  => 'P',
+
+                                             pi_step_log_txt     => 'Identifying IDM format - Start',
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+      --  Procedure to format the messages
+
+      sftr.pkg_msg_format.sp_validate(pi_msg_sq           => idm.msg_sq,
+
+                                      pi_msg_clob         => idm.message,
+
+                                      pi_job_id           => pi_job_id,
+
+                                      pi_debug_flg        => pi_debug_flg,
+
+                                      pi_calendar_dt      => pi_calendar_dt,
+
+                                      po_status_flg       => lv_status_flg,
+
+                                      po_records_inserted => lv_records_inserted,
+
+                                      po_records_updated  => lv_records_updated,
+
+                                      po_records_rejected => lv_records_rejected,
+
+                                      po_step_log_txt     => lv_step_log_txt);
+
+      -- Procedure to populate the idm_job_step_status table
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 1,
+
+                                             pi_start_dt         => NULL,
+
+                                             pi_end_dt           => CURRENT_DATE,
+
+                                             pi_records_inserted => lv_records_inserted,
+
+                                             pi_records_updated  => lv_records_updated,
+
+                                             pi_records_rejected => lv_records_rejected,
+
+                                             pi_step_status_flg  => lv_status_flg,
+
+                                             pi_step_log_txt     => 'Identifying IDM format - End: ' ||
+
+                                                                    lv_step_log_txt,
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+    END LOOP;
+
+    --  COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      --  ROLLBACK;
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'IDM validation fialed for job id-' || pi_job_id;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step ||
+
+                                           ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                           SQLERRM,
+
+                          p_job_id      => pi_job_id);
+
+  END sp_validate;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_STAGE_LOAD
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to split the message based on meta data & load into stage table IDM_STAGE_LOAN
+
+  PROCEDURE sp_stage_load(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                          pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                          pi_calendar_dt DATE) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_STAGE_LOAD';
+
+    --Job step status variables
+
+    lv_status_flg       VARCHAR2(1);
+
+    lv_records_inserted INTEGER;
+
+    lv_records_updated  INTEGER;
+
+    lv_records_rejected INTEGER;
+
+    lv_step_log_txt     VARCHAR2(4000);
+
+    --lv_job_step_id      NUMBER;
+
+
+
+    --Local variables
+
+    lv_message     CLOB;
+
+    lv_idm_source  sftr.idm_status.idm_source%TYPE;
+
+    lv_idm_subtype sftr.idm_status.idm_subtype%TYPE;
+
+  BEGIN
+
+    -- Fetch the msg_sq, clob message, idm sub type & source from the idm_status & idm Clob table.
+
+    FOR idm IN (SELECT msg_sq, MAX(job_step_id) AS step_id
+
+                  FROM sftr.idm_job_step_status
+
+                 WHERE step_status_flg = 'S'
+
+                   AND job_id = pi_job_id
+
+                   AND TRUNC(calendar_dt) = TRUNC(pi_calendar_dt) HAVING
+
+                 MAX(job_step_id) = 1
+
+                 GROUP BY job_id, calendar_dt, msg_sq
+
+
+
+                --    SELECT ids.msg_sq,
+
+                --                       clb.message,
+
+                --                       ids.idm_source,
+
+                --                       ids.idm_subtype
+
+                --                  FROM sftr.idm_status ids
+
+                --                  JOIN sftr.idm_clob clb
+
+                --                    ON (ids.mtex_msg_id = clb.mtex_msg_id AND
+
+                --                       ids.status_flg = 'S' AND ids.msg_sq IS NOT NULL AND
+
+                --                       ids.idm_source IS NOT NULL AND
+
+                --                       ids.idm_subtype IS NOT NULL)
+
+
+
+                ) LOOP
+
+
+
+      BEGIN
+
+        SELECT clb.message, ids.idm_source, ids.idm_subtype
+
+          INTO lv_message, lv_idm_source, lv_idm_subtype
+
+          FROM sftr.idm_status ids
+
+          JOIN sftr.idm_clob clb
+
+            ON (ids.mtex_msg_id = clb.mtex_msg_id AND
+
+               --               ids.status_flg = 'S' AND
+
+               ids.msg_sq = idm.msg_sq);
+
+      EXCEPTION
+
+        WHEN OTHERS THEN
+
+          lv_idm_source  := NULL;
+
+          lv_idm_subtype := NULL;
+
+      END;
+
+      -- Procedure to populate the idm_job_step_status table
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 2,
+
+                                             pi_start_dt         => CURRENT_DATE,
+
+                                             pi_end_dt           => NULL,
+
+                                             pi_records_inserted => 0,
+
+                                             pi_records_updated  => 0,
+
+                                             pi_records_rejected => 0,
+
+                                             pi_step_status_flg  => 'P',
+
+                                             pi_step_log_txt     => 'Loading IDM into Stage - Start',
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+      -- Procedure to split the messages & populate idm_stage_loan table
+
+      sftr.pkg_msg_format.sp_split_parse(pi_msg_sq           => idm.msg_sq,
+
+                                         pi_msg_clob         => lv_message,
+
+                                         pi_msg_source       => lv_idm_source,
+
+                                         pi_msg_subtype      => lv_idm_subtype,
+
+                                         pi_job_id           => pi_job_id,
+
+                                         pi_debug_flg        => pi_debug_flg,
+
+                                         pi_calendar_dt      => pi_calendar_dt,
+
+                                         po_status_flg       => lv_status_flg,
+
+                                         po_records_inserted => lv_records_inserted,
+
+                                         po_records_updated  => lv_records_updated,
+
+                                         po_records_rejected => lv_records_rejected,
+
+                                         po_step_log_txt     => lv_step_log_txt);
+
+      -- Procedure to populate the idm_job_step_status table
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 2,
+
+                                             pi_start_dt         => NULL,
+
+                                             pi_end_dt           => CURRENT_DATE,
+
+                                             pi_records_inserted => lv_records_inserted,
+
+                                             pi_records_updated  => lv_records_updated,
+
+                                             pi_records_rejected => lv_records_rejected,
+
+                                             pi_step_status_flg  => lv_status_flg,
+
+                                             pi_step_log_txt     => 'Loading IDM into Stage - End: ' ||
+
+                                                                    lv_step_log_txt,
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+    END LOOP;
+
+    --  COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'IDM Stage load fialed for job id-' || pi_job_id;
+
+      sftr.sp_log_message(p_application => 'SFTR-E',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step ||
+
+                                           ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                           SQLERRM,
+
+                          p_job_id      => pi_job_id);
+
+  END sp_stage_load;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- FN_GET_OIR_INVENTORY_DET
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure to lookup the isin_id, sedol_id & security_sq
+
+  FUNCTION fn_get_oir_inventory_det(pi_cusip_id  VARCHAR2,
+
+                                    pi_column_nm VARCHAR2) RETURN VARCHAR2 AS
+
+    lv_column_val VARCHAR2(100);
+
+  BEGIN
+
+    EXECUTE IMMEDIATE 'SELECT ' || pi_column_nm ||
+
+                      ' FROM oir.ref_security_inventory_det WHERE curr_rec_flg = ''Y'' AND cusip_id = ''' ||
+
+                      pi_cusip_id || ''' AND rownum = 1'
+
+      INTO lv_column_val;
+
+    RETURN lv_column_val;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      RETURN lv_column_val;
+
+  END fn_get_oir_inventory_det;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_POP_IDM_LOAN
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  --Procedure to populate the core table IDM_LOAN
+
+  PROCEDURE sp_pop_idm_loan(pi_job_id           sftr.idm_job.job_id%TYPE,
+
+                            pi_debug_flg        sftr.idm_job.debug_flg%TYPE,
+
+                            pi_calendar_dt      DATE,
+
+                            pi_msg_sq           sftr.idm_loan.msg_sq%TYPE,
+
+                            pi_msg_record_no    sftr.idm_loan.msg_record_no%TYPE,
+
+                            po_status_flg       OUT VARCHAR2,
+
+                            po_records_inserted OUT INTEGER,
+
+                            po_records_updated  OUT INTEGER,
+
+                            po_records_rejected OUT INTEGER,
+
+                            po_step_log_txt     OUT VARCHAR2) AS
+
+    --Standard variables
+
+    lv_step     VARCHAR2(250);
+
+    lv_line_num INTEGER;
+
+    lv_prog_name CONSTANT VARCHAR2(100) := 'SFTR.' || gv_package_name ||
+
+                                           '.SP_POP_IDM_LOAN';
+
+
+
+    lv_error VARCHAR2(4000);
+
+  BEGIN
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Deleting record from IDM_LOAN table for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq || ' msg_sq-' ||
+
+                     pi_msg_sq || ' msg_record_no' || pi_msg_record_no;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step,
+
+                          p_job_id      => pi_job_id);
+
+    END IF;
+
+    -- Delete the record from idm_loan tables corresponding msg_sq & msg record number
+
+    DELETE FROM sftr.idm_loan
+
+     WHERE msg_sq = pi_msg_sq
+
+       AND msg_record_no = pi_msg_record_no;
+
+    IF pi_debug_flg = 'Y' THEN
+
+      lv_line_num := $$plsql_line;
+
+      lv_step     := 'Inserting record into IDM_LOAN table for job id-' ||
+
+                     pi_job_id || ' msg_sq-' || pi_msg_sq || ' msg_sq-' ||
+
+                     pi_msg_sq || ' msg_record_no' || pi_msg_record_no;
+
+      sftr.sp_log_message(p_application => 'SFTR',
+
+                          p_program     => lv_prog_name,
+
+                          p_calendar_dt => pi_calendar_dt,
+
+                          p_message     => 'Debug Line-' || lv_line_num ||
+
+                                           ' Debug Message: ' || lv_step,
+
+                          p_job_id      => pi_job_id);
+
+    END IF;
+
+    -- Populate the idm loan table
+
+    INSERT INTO sftr.IDM_LOAN
+
+      (AREA_ID,
+
+       SOURCE_SQ,
+
+       LOAN_ID,
+
+       ALLOCATION_SQ,
+
+       TRANSACTION_DT,
+
+       AS_OF_DT,
+
+       LOAN_STATUS_CD,
+
+       LOAN_CLASS_FLG,
+
+       BUSINESS_LINE_CD,
+
+       ALLOCATION_FLG,
+
+       SECURITY_TYPE_CD,
+
+       SECURITY_ID,
+
+       FUND_ID,
+
+       BROKER_ID,
+
+       ORIGINATOR_NO,
+
+       SUB_CUSTODIAN_ID,
+
+       SECURITY_SQ,
+
+       CUSIP_ID,
+
+       ISIN_ID,
+
+       SEDOL_ID,
+
+       SYMBOL_ID,
+
+       SHARE_QTY,
+
+       CONTRACT_PRICE_AMT,
+
+       ALLOCATION_CONTRACT_AMT,
+
+       SECURITY_LOCATION_CD,
+
+       REBATE_PREMIUM_TYPE,
+
+       REBATE_PREMIUM_RT,
+
+       BANK_FEE_SPLIT_RT,
+
+       COMMISSION_RT,
+
+       MARKET_RT,
+
+       EXCHANGE_RT,
+
+       SETTLEMENT_CNTRY_CD,
+
+       COLLATERAL_CCY_CD,
+
+       TERM_DT,
+
+       TERM_TYPE_CD,
+
+       OPEN_ALLOC_COUNT,
+
+       MANUAL_ALLOC_FLG,
+
+       PRINCIPAL_TRADE_FLG,
+
+       RESERVED_FLG,
+
+       ALL_IN_RT,
+
+       COLLATERAL_TYPE,
+
+       CASH_FLG,
+
+       COLLATERAL_LEVEL_RT,
+
+       TPL_CUSTODIAN_CD,
+
+       BILLING_CCY_CD,
+
+       CASH_WASH_AMT,
+
+       DELIVERY_AMT,
+
+       REMARKS_TXT,
+
+       CLOSE_DT,
+
+       REBATE_PREM_CHNG_DT,
+
+       BANK_FEE_CHNG_DT,
+
+       COMMISSION_CHNG_DT,
+
+       LAST_ACTIVITY_PROCESSED_DT,
+
+       LAST_ACTIVITY_AS_OF_DT,
+
+       LAST_ACTIVITY_SQ,
+
+       LAST_ACTIVITY_TOE_CD,
+
+       LETTER_OF_CREDIT_FLG,
+
+       REALLOCATION_FLG,
+
+       SETTLED_FLG,
+
+       EQUILEND_LOAN_FLG,
+
+       OLD_LOAN_NO,
+
+       settlement_dt,
+
+       REBATE_PREMIUM_NEW_RT,
+
+       rr_reclaim_rt,
+
+       EXPECTED_RETURN_DT,
+
+       FILE_DT,
+
+       LAST_ACTIVITY_DT,
+
+       SM_INTEREST_RT,
+
+       SM_MATURITY_DT,
+
+       SM_PRICE_AMT,
+
+       SLH_PRCS_SWITCH_CD,
+
+       TERM_IN2_CD,
+
+       LOT_ID,
+
+       ROS_ID,
+
+       RATE_STRUCTURE_CD,
+
+       RATE_RESTRICT_PRD_CD,
+
+       RATE_RESTRICTED_DT,
+
+       TERM_VALUE_AMT,
+
+       TERM_ROLL_DT,
+
+       UTI,
+
+       UTI_PRIOR,
+
+       CALENDAR_DT,
+
+       MSG_SQ,
+
+       MSG_RECORD_NO,
+
+       LAST_MOD_SIGNON_ID,
+
+       LAST_MOD_DATE_TIME)
+
+      (SELECT TRIM(area_id) AS area_id,
+
+              DECODE(TRIM(area_id), '01', 1, '02', 2, '03', 3, '04', 4, 0) AS source_sq,
+
+              TRIM(transaction_no) AS transaction_no,
+
+              TRIM(transaction_suffix_no) AS transaction_suffix_no,
+
+              DECODE(TRIM(transaction_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(transaction_dt), 'RRRRMMDD')) AS transaction_dt,
+
+              DECODE(TRIM(as_of_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(as_of_dt), 'RRRRMMDD')) AS as_of_dt,
+
+              TRIM(loan_status_cd) AS loan_status_cd,
+
+              TRIM(loan_class_flg) AS loan_class_flg,
+
+              TRIM(business_line_cd) AS business_line_cd,
+
+              TRIM(allocation_flg) AS allocation_flg,
+
+              TRIM(security_type) AS security_type,
+
+              TRIM(security_id) AS security_id,
+
+              TRIM(account_id) AS account_id,
+
+              TRIM(broker_id) AS broker_id,
+
+              TRIM(originator_no) AS originator_no,
+
+              TRIM(clearing_agent_id) AS clearing_agent_id,
+
+              fn_get_oir_inventory_det(TRIM(cusip_id), 'SEC_SQ') AS sec_sq,
+
+              cusip_id,
+
+              fn_get_oir_inventory_det(TRIM(cusip_id), 'ISIN_ID') AS isin_id,
+
+              pkg_idm.fn_get_oir_inventory_det(TRIM(cusip_id), 'SEDOL_ID') AS sedol_id,
+
+              TRIM(symbol_id) AS symbol_id,
+
+              TO_NUMBER(REGEXP_REPLACE(TRIM(share_qty), '[^0-9]')) AS share_qty,
+
+              TO_NUMBER(TRIM(share_price_amt)) AS share_price_amt,
+
+              TO_NUMBER(TRIM(allocation_contract_amt)) AS allocation_contract_amt,
+
+              TRIM(security_location_cd) AS security_location_cd,
+
+              TRIM(rebate_premium_type) AS rebate_premium_type,
+
+              TO_NUMBER(TRIM(rebate_premium_rt)) AS rebate_premium_rt,
+
+              TO_NUMBER(TRIM(bank_fee_split_rt)) AS bank_fee_split_rt,
+
+              TO_NUMBER(TRIM(commission_rt)) AS commission_rt,
+
+              TO_NUMBER(TRIM(market_rt)) AS market_rt,
+
+              TO_NUMBER(TRIM(exchange_rt)) AS exchange_rt,
+
+              TRIM(settlement_cd) AS settlement_cd,
+
+              TRIM(collateral_cd) AS collateral_cd,
+
+              DECODE(TRIM(term_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(term_dt), 'RRRRMMDD')) AS term_dt,
+
+              TRIM(term_flg) AS term_flg,
+
+              DECODE(TO_NUMBER(TRIM(allocations_ct)),
+
+                     3,
+
+                     NULL,
+
+                     TO_NUMBER(TRIM(allocations_ct))) AS allocations_ct,
+
+              TRIM(manual_allocation_flg) AS manual_allocation_flg,
+
+              DECODE(TRIM(principal_trade_flg), '1', 'Y', 'N') AS principal_trade_flg,
+
+              TRIM(reserved_flg) AS reserved_flg,
+
+              TO_NUMBER(TRIM(all_in_rt)) AS all_in_rt,
+
+              TRIM(collateral_type) AS collateral_type,
+
+              DECODE(TRIM(cash_flg), '1', 'Y', 'N') AS cash_flg,
+
+              TO_NUMBER(TRIM(collateral_level_rt)) AS collateral_level_rt,
+
+              TRIM(tpl_custodian_id) AS tpl_custodian_id,
+
+              TRIM(billing_cd) AS billing_cd,
+
+              TO_NUMBER(TRIM(cash_wash_amt)) AS cash_wash_amt,
+
+              TO_NUMBER(TRIM(delivery_amt)) AS delivery_amt,
+
+              TRIM(remarks_txt) AS remarks_txt,
+
+              DECODE(TRIM(close_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(close_dt), 'RRRRMMDD')) AS close_dt,
+
+              DECODE(TRIM(rebate_premium_changed_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(rebate_premium_changed_dt), 'RRRRMMDD')) AS rebate_premium_changed_dt,
+
+              DECODE(TRIM(bank_fee_changed_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(bank_fee_changed_dt), 'RRRRMMDD')) AS bank_fee_changed_dt,
+
+              DECODE(TRIM(commission_changed_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(commission_changed_dt), 'RRRRMMDD')) AS commission_changed_dt,
+
+              DECODE(TRIM(last_activity_processed_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(last_activity_processed_dt), 'RRRRMMDD')) AS last_activity_processed_dt,
+
+              DECODE(TRIM(last_activity_as_of_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     '19000101',
+
+                     NULL,
+
+                     TO_DATE(TRIM(last_activity_as_of_dt), 'RRRRMMDD')) AS last_activity_as_of_dt,
+
+              TRIM(last_activity_sq) AS last_activity_sq,
+
+              TRIM(last_activity_toe_cd) AS last_activity_toe_cd,
+
+              DECODE(TRIM(letter_of_credit_flg), '1', 'Y', 'N') AS letter_of_credit_flg,
+
+              DECODE(TRIM(reallocation_rsl_flg), '1', 'Y', 'N') AS reallocation_rsl_flg,
+
+              TRIM(settled_flg) AS settled_flg,
+
+              TRIM(equilend_loan_flg) AS equilend_loan_flg,
+
+              TRIM(old_loan_no) AS old_loan_no,
+
+              DECODE(TRIM(settlement_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(settlement_dt), 'RRRRMMDD')) AS settlement_dt,
+
+              TO_NUMBER(TRIM(REBATE_PREMIUM_NEW_RT)) AS rebate_prmm_new_rt,
+
+              TO_NUMBER(TRIM(rr_reclaim_rt)) AS rr_reclaim_rt,
+
+              DECODE(TRIM(expected_return_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(expected_return_dt), 'RRRRMMDD')) AS expected_return_dt,
+
+              DECODE(TRIM(file_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(file_dt), 'RRRRMMDD')) AS file_dt,
+
+              DECODE(TRIM(last_activity_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(last_activity_dt), 'RRRRMMDD')) AS last_activity_dt,
+
+              TO_NUMBER(TRIM(sm_interest_rt)) AS sm_interest_rt,
+
+              DECODE(TRIM(sm_maturity_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(sm_maturity_dt), 'RRRRMMDD')) AS sm_maturity_dt,
+
+              TO_NUMBER(TRIM(sm_price_amt)) AS sm_price_amt,
+
+              TRIM(slh_process_switch_cd) AS slh_process_switch_cd,
+
+              TRIM(term_in2_cd) AS term_in2_cd,
+
+              TRIM(lot_id) AS lot_id,
+
+              TRIM(ros_id) AS ros_id,
+
+              TRIM(rate_structure_cd) AS rate_structure_cd,
+
+              TRIM(rate_restricted_period_cd) AS rate_restricted_period_cd,
+
+              DECODE(TRIM(rate_restricted_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(rate_restricted_dt), 'RRRRMMDD')) AS rate_restricted_dt,
+
+              TO_NUMBER(TRIM(term_value_amt)) AS term_value_amt,
+
+              DECODE(TRIM(term_roll_dt),
+
+                     '00000000',
+
+                     NULL,
+
+                     TO_DATE(TRIM(term_roll_dt), 'RRRRMMDD')) AS term_roll_dt,
+
+              NULL,
+
+              NULL,
+
+              TRUNC(CALENDAR_DT) AS CALENDAR_DT,
+
+              msg_sq,
+
+              msg_record_no,
+
+              USER,
+
+              CURRENT_DATE
+
+         FROM sftr.idm_stage_loan idm
+
+        WHERE msg_sq = pi_msg_sq
+
+          AND msg_record_no = pi_msg_record_no);
+
+    po_records_inserted := SQL%ROWCOUNT; -- Find the success record count
+
+    po_status_flg       := 'S'; -- Set the status 'S'
+
+    po_step_log_txt     := 'Success';
+
+    COMMIT;
+
+  EXCEPTION
+
+    WHEN OTHERS THEN
+
+      ROLLBACK;
+
+      lv_error := ' Error Trapped... ' || SQLCODE || '.' || SQLERRM;
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Deleting record from IDM_ERROR_RECORD table for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq || ' msg_sq-' ||
+
+                       pi_msg_sq || ' msg_record_no' || pi_msg_record_no ||
+
+                       ' Error Trapped... ' || SQLCODE || '.' || SQLERRM;
+
+        sftr.sp_log_message(p_application => 'SFTR-E',
+
+                            p_program     => lv_prog_name,
+
+                            p_calendar_dt => pi_calendar_dt,
+
+                            p_message     => 'Debug Line-' || lv_line_num ||
+
+                                             ' Debug Message: ' || lv_step,
+
+                            p_job_id      => pi_job_id);
+
+      END IF;
+
+      -- Core table load failed then it should delete the corresponding records from idm_error_record table if exists.
+
+      DELETE FROM sftr.idm_error_record
+
+       WHERE msg_sq = pi_msg_sq
+
+         AND msg_record_no = pi_msg_record_no;
+
+      IF pi_debug_flg = 'Y' THEN
+
+        lv_line_num := $$plsql_line;
+
+        lv_step     := 'Inserting record into IDM_ERROR_RECORD table for job id-' ||
+
+                       pi_job_id || ' msg_sq-' || pi_msg_sq || ' msg_sq-' ||
+
+                       pi_msg_sq || ' msg_record_no' || pi_msg_record_no;
+
+        sftr.sp_log_message(p_application => 'SFTR',
+
+                            p_program     => lv_prog_name,
+
+                            p_calendar_dt => pi_calendar_dt,
+
+                            p_message     => 'Debug Line-' || lv_line_num ||
+
+                                             ' Debug Message: ' || lv_step,
+
+                            p_job_id      => pi_job_id);
+
+      END IF;
+
+      -- Populate the error record into idm_error_record table
+
+      INSERT INTO sftr.idm_error_record
+
+        (MSG_SQ,
+
+         MSG_RECORD_NO,
+
+         CALENDAR_DT,
+
+         ERROR_MSG,
+
+         last_mod_signon_id,
+
+         last_mod_date_time)
+
+      VALUES
+
+        (pi_msg_sq,
+
+         pi_msg_record_no,
+
+         pi_calendar_dt,
+
+         lv_error,
+
+         USER,
+
+         CURRENT_DATE);
+
+      po_records_rejected := SQL%ROWCOUNT; -- Find the error record count.
+
+      po_status_flg       := 'S';
+
+      po_step_log_txt     := 'Success';
+
+      COMMIT;
+
+      --RAISE;
+
+  END;
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- SP_ENRICH_XREF_LOAD
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  PROCEDURE sp_enrich_xref_load(pi_job_id      sftr.idm_job.job_id%TYPE,
+
+                                pi_debug_flg   sftr.idm_job.debug_flg%TYPE,
+
+                                pi_calendar_dt DATE) AS
+
+    --Job step status variables
+
+    lv_status_flg       VARCHAR2(1);
+
+    lv_rec_inserted     INTEGER;
+
+    lv_rec_rejected     INTEGER;
+
+    lv_records_inserted INTEGER;
+
+    lv_records_updated  INTEGER;
+
+    lv_records_rejected INTEGER;
+
+    lv_step_log_txt     VARCHAR2(4000);
+
+    --lv_job_step_id      NUMBER;
+
+  BEGIN
+
+    -- TODO: Implementation required for PROCEDURE PKG_IDM.sp_idm
+
+    FOR idm IN (SELECT job_id,
+
+                       calendar_dt,
+
+                       msg_sq,
+
+                       MAX(job_step_id) AS step_id,
+
+                       MAX(DECODE(job_step_id, 2, records_inserted)) AS records_inserted
+
+                  FROM sftr.idm_job_step_status
+
+                 WHERE step_status_flg = 'S'
+
+                   AND job_id = pi_job_id
+
+                   AND TRUNC(calendar_dt) = TRUNC(pi_calendar_dt) HAVING
+
+                 MAX(job_step_id) = 2
+
+                 GROUP BY job_id, calendar_dt, msg_sq) LOOP
+
+      DELETE FROM sftr.idm_loan WHERE msg_sq = idm.msg_sq;
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 3,
+
+                                             pi_start_dt         => CURRENT_DATE,
+
+                                             pi_end_dt           => NULL,
+
+                                             pi_records_inserted => 0,
+
+                                             pi_records_updated  => 0,
+
+                                             pi_records_rejected => 0,
+
+                                             pi_step_status_flg  => 'P',
+
+                                             pi_step_log_txt     => 'IDM enrichment and load - Start',
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+      FOR msg_rec_no IN 1 .. idm.records_inserted LOOP
+
+        pkg_idm.sp_pop_idm_loan(pi_job_id           => pi_job_id,
+
+                                pi_debug_flg        => pi_debug_flg,
+
+                                pi_calendar_dt      => pi_calendar_dt,
+
+                                pi_msg_sq           => idm.msg_sq,
+
+                                pi_msg_record_no    => msg_rec_no,
+
+                                po_status_flg       => lv_status_flg,
+
+                                po_records_inserted => lv_records_inserted,
+
+                                po_records_updated  => lv_records_updated,
+
+                                po_records_rejected => lv_records_rejected,
+
+                                po_step_log_txt     => lv_step_log_txt);
+
+        lv_rec_rejected := lv_rec_rejected + lv_records_rejected;
+
+        lv_rec_inserted := lv_rec_inserted + lv_records_inserted;
+
+      END LOOP;
+
+      sftr.pkg_idm.sp_job_step_status_update(pi_job_id           => pi_job_id,
+
+                                             pi_calendar_dt      => pi_calendar_dt,
+
+                                             pi_msg_sq           => idm.msg_sq,
+
+                                             pi_job_step_id      => 3,
+
+                                             pi_start_dt         => NULL,
+
+                                             pi_end_dt           => CURRENT_DATE,
+
+                                             pi_records_inserted => lv_rec_inserted,
+
+                                             pi_records_updated  => lv_records_updated,
+
+                                             pi_records_rejected => lv_rec_rejected,
+
+                                             pi_step_status_flg  => lv_status_flg,
+
+                                             pi_step_log_txt     => 'IDM enrichment and load - End:' ||
+
+                                                                    lv_step_log_txt,
+
+                                             pi_debug_flg        => pi_debug_flg);
+
+    END LOOP;
+
+  END sp_enrich_xref_load;
+
+END PKG_IDM;
+/

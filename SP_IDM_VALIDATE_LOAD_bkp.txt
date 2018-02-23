@@ -1,0 +1,156 @@
+CREATE OR REPLACE PROCEDURE SFTR.SP_IDM_VALIDATE_LOAD(pi_job_id sftr.idm_job.job_id%TYPE) AS
+
+  --Standard variables
+
+  lv_step     VARCHAR2(250);
+
+  lv_line_num INTEGER;
+
+  lv_prog_name  CONSTANT VARCHAR2(100) := 'SFTR.SP_IDM_VALIDATE_LOAD';
+
+  lv_current_dt CONSTANT DATE := CURRENT_DATE;
+
+  lv_calendar_dt sftr.idm_job.calendar_dt%TYPE;
+
+  lv_debug_flg   sftr.idm_job.debug_flg%TYPE;
+
+BEGIN
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Procedure triggers the stage and core load of DML messages from IDM_CLOB
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  --Loggind the debug messages to debug_message tables ...
+
+  lv_line_num := $$plsql_line;
+
+  lv_step     := 'Getting calendar date for job id' || pi_job_id;
+
+  sp_log_message(p_application => 'SFTR',
+
+                 p_program     => lv_prog_name,
+
+                 p_calendar_dt => TRUNC(lv_current_dt),
+
+                 p_message     => 'Debug Line-' || lv_line_num ||
+
+                                  ' Debug Message: ' || lv_step,
+
+                 p_job_id      => pi_job_id);
+
+
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Get Calendar date and debug flag ...
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+
+
+  SELECT calendar_dt, debug_flg
+
+    INTO lv_calendar_dt, lv_debug_flg
+
+    FROM sftr.idm_job
+
+   WHERE job_id = pi_job_id
+
+     AND active_flg = 'Y';
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Calling procedure for updating the status to 'P' in IDM_STATUS
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+
+
+  sftr.pkg_idm.sp_status_update(pi_job_id      => pi_job_id,
+
+                                pi_debug_flg   => lv_debug_flg,
+
+                                pi_calendar_dt => lv_calendar_dt
+
+                                --                                pi_update_flg  => 1, -- 1 - Updating status as 'P' and msg_sq
+
+                                --                                pi_status_flg  => 'P',
+
+                                --                                pi_msg_sq      => NULL -- No need to provide actual value for this parameter in the case of  pi_update_flg => 1
+
+                                );
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Calling procedure for updating the source and message type in IDM_STATUS
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  sftr.pkg_idm.sp_validate(pi_job_id      => pi_job_id,
+
+                           pi_debug_flg   => lv_debug_flg,
+
+                           pi_calendar_dt => lv_calendar_dt);
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Calling procedure for DML message stage loading
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+
+
+  sftr.pkg_idm.sp_stage_load(pi_job_id      => pi_job_id,
+
+                             pi_debug_flg   => lv_debug_flg,
+
+                             pi_calendar_dt => lv_calendar_dt);
+
+
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+  -- Calling procedure for DML message core loading
+
+  ------------------------------------------------------------------------------------------------------------------------
+
+
+
+  sftr.pkg_idm.sp_enrich_xref_load(pi_job_id      => pi_job_id,
+
+                                   pi_debug_flg   => lv_debug_flg,
+
+                                   pi_calendar_dt => lv_calendar_dt);
+
+EXCEPTION
+
+  WHEN OTHERS THEN
+
+    dbms_output.put_line(dbms_utility.format_error_backtrace());
+
+    lv_line_num := $$plsql_line;
+
+    lv_step     := 'IDM job fialed for job id' || pi_job_id;
+
+    sp_log_message(p_application => 'SFTR',
+
+                   p_program     => lv_prog_name,
+
+                   p_calendar_dt => lv_calendar_dt,
+
+                   p_message     => 'Debug Line-' || lv_line_num ||
+
+                                    ' Debug Message: ' || lv_step ||
+
+                                    ' Error Trapped... ' || SQLCODE || '.' ||
+
+                                    SQLERRM,
+
+                   p_job_id      => pi_job_id);
+
+    --RAISE;
+
+END SP_IDM_VALIDATE_LOAD;
+/
