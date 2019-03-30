@@ -1,0 +1,166 @@
+																OutSystems Tutorials
+
+OutSystems Overview
+
+	1. Low Code Rapid Application Development [RAD] platform for enterprise grade web and mobile applications
+	2. Its provides Full Stack Systems for developers
+	3. Its enables Admin and Ops apps
+	4. Its enables deploy & manages the apps
+
+
+OutSYstems Platform:
+
+1. weave in existing code and integrate with anything
+2. visual design and development like data, processes, user intefaces[ui]
+	a. data: import existing data or new data model from any source for your requirements
+	b. processes: we can visually design and logic and underlining processes.
+	c. UI: we can design all the interacting screens.
+3. standard and optimized: you can use Java/.NET stack standards for your business logic. 
+4. continous integration and delivery - once the applications is deployed in the outsystems environment, we can manage full lifecycle of applications like deploy, integrity, governance and monitoring	
+	Cloud,Hybrid, on Premises deployment
+
+
+OutSystems Components & Tools:
+	OutSystems Enterprise Installation
+	this involves
+1. Service Studio
+2. Service Center
+3. LifeTime
+4. Integration Studio
+5. Platform Server
+
+Platform Server: These Platform servers instances are different for different environments
+	environments like 
+	a. Development environment
+	b. UAT/SIT environment
+	c. Preprod/Staging environment
+	d. Production environment
+	
+	and each environment has its own platform servers which will later communicates with application servers to manage the lifecycle of applications.
+	
+	The developed apps will be first published to platform servers where the applications versioning will be happened and later you can select a version of that and deploy in application server like [JBoss/Weblogic for Java Stack]
+	These are set of servers that will compile deploy manages and runs the applications
+
+Service Studio: This is IDE used to create enterprise web & mobile applications.
+			This is low code development environment that lets developers to rapidly create and update the web applications, services and mobile apps.
+Since most of the time developers work in Service Studio, they will publish the applications to platform server.
+depending the vast developers community - OutSystems provides .NET Stack and Java Stack 
+
+.NET Stack involves: 
+.aspx,.dll or IIS Servers
+DB: Microsoft SQL Server / Oracle
+
+Java Stack Involves:
+.jsp and .jar on JBoss/Weblogic Application Servers
+DB: Oracle or MySQL
+
+Integration Studio: this is IDE for integrating with external resources/systems and get the data accordingly
+
+Service Center: Platform Server management console where in its having administration console for deploying, managing and monitoring the applications and its states that are hosted on these servers.
+This can be accessible via browser like ex: https://shashikiran-v.outsystemscloud.com/ServiceCenter/
+
+LifeTime: Its cross Environment management console provides complete application lifecycle management [ALM] through browser [accessible via browser]
+
+OutSystems Forge: Its a repository kind of maven repository for java stack where in you will find all the necessary add-ons/plugins to extend its capabilities.
+
+Popular Components
+1. Silk UI Components
+2. Google Maps
+3. FileSystem and etc....
+
+
+What is Service Studio:
+
+This is an IDE for developing OutSystems platform
+
+provides following functionalities for developers
+1. Data
+2. Create UI for your apps
+3. define bussiness logic
+4. define business processes.
+5. manages the publish to platform servers [environments like develop,uat/sit, preprod, prod] from service studio
+
+
+Screen Lifecycle:
+
+Normally Screen works based upon HTTP Request and Response Architecture. 
+1. from browser, we will send a request to a resource normally http get request [GET Request] 
+2. later once server receives that request, it will validates
+3. and processes [executes logic and gather data] the request and sends them back the response. -- response may be PDF/ZIP/JPG/PNG/GIF format or HTML Format or XML/JSON Format for that matter
+
+
+Dynamic HTTP Request
+1. Input Parameter -- if its value coming from the request
+2. Local Variables -- if its value is initialized under screen scope
+
+screen scope variables lifecycle limited to that screen and once you come out of that you will lose that value for that variable
+
+
+Preparation phase:
+
+Before the server prepares screen loading, we need to execute logic, gather data and render the response related to that request --- this is done basically in an action called preparation action
+THis action runs before the screen loads and performs some data sql queries and aggregates functions(), execute logic and alter local variables to be displayed in screen.
+
+
+Building the screen
+
+This usually takes places after preparation action is completed successfully
+contents of the page will be render from top to bottom using widgets [toolbox] available in outsystems(service studio - left side bar)
+
+
+Modelling Data:
+
+What is Data Type?
+Every variable is having its own data type that tells what value that variable can hold. 
+OutSystems variables are strongly typed -- once declare with that type, you cannot change its value to someother type later
+
+OutSystems datatype
+
+Text - String - alphanumeric
+Integers - numeric
+DateTime -- date & time
+LOB -- Binary data [BLOB]
+Boolean - boolean [true,false]
+
+
+Data Modelling
+
+1. mapping application core types to programming language types
+2. There will be complex types and they are also called as compound types
+   OutSystems supports 3 complex types
+	a. Entities  ----  An Entity is most common used in OutSystems environment/platform
+		A different entity should be created for each application concept
+		Customer, Order, Order Item are 3 different entities
+		
+		OutSystems platform automatically manages the creation of the underlying database tables as data is stored as entities
+		
+		Entities will be persisted in database table and a each record are inserted as row on that table
+		AN Entities/ Backend Persistent table will have arbitary number of fields/columns done by using CRUD operations
+		
+		Attributes:
+		
+		An Entity's actual data will be seen in the fields/columns of that entity and each column/field/attribute will have its own data type defined above.
+		Every Entity will be defined with special id attribute [primary keys] to support relational operations and mappings between other entities
+		
+		Each attribute will be defined as separate columns in database table.
+		
+		Every Entities will come up with Entity Actions [Business Logic ---- CRUD operations like Create,Get,Update,Delete operations on those entities]
+		
+		
+	b. Static Entities ----
+		Static Entities are kind of static/master tables with all the possible values --- rows in the database table
+		Each of the values are considered as rows in that static entity
+		and these static entities are read only that means --- we can only retreive information from those entities but not delete or modify anything
+		that means only Get<StaticEntity> entity action will be available and not having any other update/delete/create entity action
+		The values for each columns per record are added at design time and cannot be added at any further/future time
+		Static Entity are Final Entity [Immutable Entity] ---- That means once created we cannot alter/change/modify those entities
+	
+	c. Structures ----
+		Structures are the in memory objects used to store return value from for example webservice call. these can be basic data types are even entity type as well.
+		These are used to process during some point of time in your functionality and throw it away once done.
+		Structures are used to hold compound data. for example : CustomerInfo having orders details as well for processing.
+
+
+Variables: 
+variables are similar to other programming languages. they are used to store values of that type for further processing.
+these variables are located in memory related to outsystems. and are most frequently of single/compound type
