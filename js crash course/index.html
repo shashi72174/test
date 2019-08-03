@@ -1,0 +1,57 @@
+<html>
+    <head>
+       
+        
+    </head>
+    
+    <body>
+        <!-- <h1>JS Crash Course 4</h1> -->
+        <div align="center">
+            <form onsubmit="return validate()" action="welcome.html">
+                <input type="text" id="username" name="username" placeholder="Username" />
+                <br/>
+
+                <br/>
+                <input type="password" id="password" name="password" placeholder="Password" />
+                <br/>
+
+                <br/>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+        <script type="text/javascript">
+            function validate() {
+                if(document.getElementById("username").value=="" || document.getElementById("username").value==null) {
+                    document.getElementById("username").focus();
+                    document.getElementById("username").style.border="solid red"
+                    return false;
+                }else {
+                    if(document.getElementById("username").value.length<5) {
+                        alert("username length should be atleast 5 characters");
+                        document.getElementById("username").focus();
+                        document.getElementById("username").style.border="solid red"
+                        return false;
+                    }
+                    
+                } 
+                
+                if(document.getElementById("password").value=="" || document.getElementById("password").value==null) {
+                    document.getElementById('password').focus(); 
+                    document.getElementById("password").style.border="solid  red"
+                    return false;
+                }else {
+                    if(document.getElementById("password").value.length<5) {
+                        alert("password length should be atleast 5 characters");
+                        document.getElementById('password').focus(); 
+                        document.getElementById("password").style.border="solid  red"
+                        return false;
+                    }
+                    
+                }
+                return true
+            }
+        </script>
+        
+    </body>
+
+</html>

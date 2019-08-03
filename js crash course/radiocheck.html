@@ -1,0 +1,44 @@
+<html>
+    <head>
+       
+        
+    </head>
+    
+    <body>
+        <input type="radio" name="radiogrp" onchange="func1()" value="Radio1" checked="checked" >Radio 1 </input>
+        <input type="radio" name="radiogrp" onchange="func1()"value="Radio2" >Radio 2 </input>
+        <input type="radio" name="radiogrp" onchange="func1()"value="Radio3" >Radio 3 </input>
+        <input type="radio" name="radiogrp" onchange="func1()"value="Radio4" >Radio 4 </input>
+
+        <div id="displayContainer1" style="display: block">
+            Radio 1 is active
+        </div>
+        <div id="displayContainer2" style="display: none">
+            Radio 2 is active
+        </div>
+        <div id="displayContainer3" style="display: none">
+            Radio 3 is active
+        </div>
+        <div id="displayContainer4" style="display: none">
+            Radio 4 is active
+        </div>
+    </body>
+    <script type="text/javascript">
+        function func1() {
+            let radiogrp = document.getElementsByName("radiogrp");
+            for(let i=0;i<radiogrp.length;i++) {
+                if(radiogrp[i].checked)
+                    document.getElementById("displayContainer"+(i+1)).style = "display: block";
+                else 
+                    document.getElementById("displayContainer"+(i+1)).style = "display: none";
+            }
+        }
+
+        /* function func1() {
+            if(document.getElementById("nocheck").checked)
+                document.getElementById("displayContainer").style = "display: none";
+            else if(document.getElementById("yescheck").checked)
+                document.getElementById("displayContainer").style = "display: block";
+        } */
+    </script>
+</html>
