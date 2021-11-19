@@ -1,0 +1,4 @@
+com\springmvcrabbitmqexample\config\RabbitMQConfig.class
+com\springbootrabbitmqexample\model\Person.class
+com\springmvcrabbitmqexample\controllers\TestController.class
+com\springbootrabbitmqexample\service\RabbitMQService.class
